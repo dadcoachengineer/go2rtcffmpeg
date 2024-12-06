@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: go2rtc
+    configs:
+      - source: go2rtc_config
+        target: /config/go2rtc.yaml
+    ports:
+      - "1984:1984"   # Web interface
+      - "8554:8554"   # RTSP server
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    networks:
+      - go2rtc_network
+
+  ffmpeg:
+    image: jrottenberg/ffmpeg:latest
+    container_name: ffmpeg
+    depends_on:
+      - go2rtc
+    command: >
+      -re -i rtsp://go2rtc:8554/my_camera
+      -vf scale=2560:1440
+      -c:v libx264 -preset fast -b:v 3000k -maxrate 3000k -bufsize 6000k
+      -g 80 -keyint_min 80 -c:a aac -b:a 128k
+      -f flv rtmp://a.rtmp.youtube.com/live2/<<your youtube key here>
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+    networks:
+      - go2rtc_network
+
+configs:
+  go2rtc_config:
+    file: ./go2rtc.yaml
+
+networks:
+  go2rtc_network:
+    driver: overlay
